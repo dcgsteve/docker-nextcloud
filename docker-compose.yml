@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  db:
+    image: mariadb
+    container_name: hub-db
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    restart: always
+    volumes:
+      - /data/hub/db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - /etc/localtime:/etc/localtime:ro
+
+  redis:
+    image: redis:alpine
+    container_name: hub-redis
+    restart: always
+    command: redis-server --requirepass 123
+
+  app:
+    image: nextcloud:latest
+    container_name: hub-app
+    restart: always
+    volumes:
+      - /data/hub/html:/var/www/html
+    ports:
+      - 80:80
+    environment:
+      - TZ-=Europe/London
+      - MYSQL_HOST=db
+      - REDIS_HOST=redis
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - NEXTCLOUD_ADMIN_USER=admin
+      - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
+      - REDIS_HOST_PASSWORD=123
+    depends_on:
+      - db
+      - redis
+
+  cron:
+    image: nextcloud:apache
+    container_name: hub-cron
+    restart: always
+    volumes:
+      - /data/hub/html:/var/www/html
+    entrypoint: /cron.sh
+    networks:
+      - default
+    depends_on:
+      - db
+      - redis
